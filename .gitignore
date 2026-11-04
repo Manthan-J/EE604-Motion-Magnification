@@ -218,3 +218,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# EE604 project-local inputs and generated media
+# Keep manifests, source code, plots, and documentation in Git; share bulky video
+# assets separately and reproduce them using the recorded parameters.
+data/**/*.mp4
+data/**/*.avi
+results/**/*.mp4
+results/**/*.avi
+PyEVM/*.mp4
+PyEVM/*.avi
+uploads/
+temp/
+
+# Editor and upstream-clone metadata
+.idea/
+PyEVM/.git.upstream-backup/
