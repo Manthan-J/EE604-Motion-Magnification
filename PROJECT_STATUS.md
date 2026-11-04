@@ -5,7 +5,7 @@ This file is the source of truth for verified implementation progress, decisions
 ## Last Updated
 
 - **Date:** November 4, 2026
-- **Update:** Synchronized the local project with `origin/main` and prepared a clean single-repository collaboration baseline.
+- **Update:** Added the six verified input videos to the shared repository for teammate testing while keeping generated outputs excluded.
 
 ## Current Phase
 
@@ -36,6 +36,7 @@ This file is the source of truth for verified implementation progress, decisions
 - Attached the local `main` branch to the existing GitHub `origin/main` initial commit without overwriting local project work.
 - Extended the repository `.gitignore` so the virtual environment, editor state, downloaded benchmark videos, and generated video outputs remain local rather than entering Git history.
 - Converted `PyEVM/` from a nested Git checkout into ordinary attributed reference source and recorded its upstream repository and exact commit in `PyEVM/UPSTREAM.md`.
+- Added the MIT `face`, `subway`, and `wrist` benchmarks, the derived half-resolution wrist input, and PyEVM's `baby` and `guitar` inputs to Git for reproducible teammate testing.
 
 ## In Progress
 
@@ -68,6 +69,7 @@ This file is the source of truth for verified implementation progress, decisions
 - Visual inspection found strong false-color artifacts in face, severe noise/ringing in subway, and heavy block/ringing/color artifacts in wrist; none is a clean successful EVM result.
 - `HEAD`, local `main`, and `origin/main` were aligned at the remote initial commit `7731d16` before staging the local project baseline.
 - `git status --ignored` confirmed that `venv/`, benchmark MP4 files, and generated AVI outputs are excluded while source and manifest files remain available for tracking.
+- The six shared MP4 inputs total approximately 11.8 MiB; generated AVI outputs remain ignored and untracked.
 
 ## Known Problems and Blockers
 

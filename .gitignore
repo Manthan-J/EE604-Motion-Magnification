@@ -228,6 +228,14 @@ results/**/*.mp4
 results/**/*.avi
 PyEVM/*.mp4
 PyEVM/*.avi
+
+# Small, verified inputs intentionally shared for teammate testing
+!data/benchmarks/mit_evm/face.mp4
+!data/benchmarks/mit_evm/subway.mp4
+!data/benchmarks/mit_evm/wrist.mp4
+!data/derived/wrist_half_resolution.mp4
+!PyEVM/baby.mp4
+!PyEVM/guitar.mp4
 uploads/
 temp/
 
