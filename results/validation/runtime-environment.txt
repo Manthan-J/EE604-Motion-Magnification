@@ -1,0 +1,3 @@
+Windows 10 | AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD
+Python 3.9.13 | OpenCV 5.0.0 | NumPy 2.0.2
+Single run per configuration; decoding, plotting, and encoding excluded. PSD estimation included in automatic configurations.
