@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -15,7 +16,7 @@ import streamlit as st
 
 from auto_frequency import estimate_dominant_frequency, extract_roi_signal
 from auto_roi import suggest_periodic_roi
-from roi_magnification import load_video, magnify_frames
+from roi_magnification import cache_video_frames, iter_magnified_frames
 
 
 def first_frame(path):
@@ -59,8 +60,8 @@ def encode_original_preview(source, output):
 
 
 def encode_mp4(path, original, processed, fps, comparison):
-    """Encode browser-compatible H.264 with even dimensions and source timing."""
-    height, width = processed.shape[1:3]
+    """Stream processed frames to H.264 with even dimensions and source timing."""
+    height, width = original.shape[1:3]
     if comparison:
         width *= 2
     command = [
@@ -75,8 +76,8 @@ def encode_mp4(path, original, processed, fps, comparison):
     with path.with_suffix(".log").open("w+b") as errors:
         with subprocess.Popen(command, stdin=subprocess.PIPE, stderr=errors) as process:
             try:
-                for source, result in zip(original, processed):
-                    frame = np.concatenate((source, result), axis=1) if comparison else result
+                for i, result in enumerate(processed):
+                    frame = np.concatenate((original[i], result), axis=1) if comparison else result
                     process.stdin.write(frame.tobytes())
                 process.stdin.close()
             except BrokenPipeError:
@@ -110,7 +111,7 @@ def select_roi(frame, data, suffix, upload_key, channel):
         key = (upload_key, channel)
         if st.session_state.get("roi_suggestion", (None,))[0] != key:
             try:
-                with st.spinner("Searching for localized periodic activity…"), TemporaryDirectory() as directory:
+                with st.spinner("Searching for localized periodic activity\u2026"), TemporaryDirectory() as directory:
                     path = Path(directory) / f"input{suffix}"
                     path.write_bytes(data)
                     suggestion = suggest_periodic_roi(path, channel=channel)
@@ -125,7 +126,7 @@ def select_roi(frame, data, suffix, upload_key, channel):
         detection_roi = suggestion.box
         scale = st.slider("Magnification box scale", 1, 4, 3, format="%dx")
         roi = expand_roi(detection_roi, scale, width, height)
-        st.caption(f"Yellow is the {detection_roi[2]} × {detection_roi[3]} pixel frequency patch "
+        st.caption(f"Yellow is the {detection_roi[2]} \u00d7 {detection_roi[3]} pixel frequency patch "
                    f"({suggestion.peak_hz:.2f} Hz). Cyan shows the magnified area when enlarged.")
     else:
         st.caption("Set the horizontal and vertical bounds in original video pixels.")
@@ -144,8 +145,13 @@ def select_roi(frame, data, suffix, upload_key, channel):
 
 
 def process_video(path, output, settings):
+    """Process an upload using temporary disk storage for full-clip arrays."""
+    with cache_video_frames(path, output.parent) as (frames, fps):
+        return process_decoded_frames(frames, fps, output, settings)
+
+
+def process_decoded_frames(frames, fps, output, settings):
     """Estimate the input spectrum, magnify the selected band, and export playback."""
-    frames, fps = load_video(path, max_decoded_bytes=192 * 1024**2)
     low, high = settings["manual_band"]
     roi = settings["roi"]
     if not 0 < low < high < fps / 2:
@@ -165,13 +171,15 @@ def process_video(path, output, settings):
         if automatic and estimate.reliable:
             low, high = estimate.low_hz, estimate.high_hz
 
-    processed = magnify_frames(
+    processed = iter_magnified_frames(
         frames, fps, low, high,
         roi=None if roi == (0, 0, frames.shape[2], frames.shape[1]) else roi,
         amplification=settings["alpha"],
         artifact_suppression=settings["suppression"],
+        scratch_directory=output.parent,
     )
-    video = encode_mp4(output, frames, processed, fps, settings["comparison"])
+    with closing(processed):
+        video = encode_mp4(output, frames, processed, fps, settings["comparison"])
     return {"video": video, "estimate": estimate, "band": (low, high),
             "search_band": search_band}
 
@@ -201,19 +209,19 @@ def display_spectrum(estimate, search_band):
             color="#ffab40", filled=True, size=85
         )
     st.altair_chart(chart)
-    st.caption(f"The shaded region is the peak search range ({low:.2f}–{high:.2f} Hz). "
+    st.caption(f"The shaded region is the peak search range ({low:.2f}\u2013{high:.2f} Hz). "
                "Peaks outside it are excluded. An orange dot marks the selected peak when available.")
 
 
 def display_result(result, settings):
     """Show only results generated with the current inputs and settings."""
     low, high = result["band"]
-    st.write(f"Applied passband **{low:.3f}–{high:.3f} Hz**")
+    st.write(f"Applied passband **{low:.3f}\u2013{high:.3f} Hz**")
     estimate = result["estimate"]
     if estimate is not None:
         search_low, search_high = result["search_band"]
         if estimate.reliable:
-            st.write(f"Selected ROI peak within {search_low:.2f}–{search_high:.2f} Hz "
+            st.write(f"Selected ROI peak within {search_low:.2f}\u2013{search_high:.2f} Hz "
                      f"**{estimate.peak_hz:.3f} Hz** ({estimate.bpm:.1f} cycles/min)")
         elif settings["frequency_mode"] == "Automatic":
             st.warning(f"{estimate.message} Used the manual fallback band.")
@@ -234,7 +242,7 @@ def main():
     st.caption("Visualise subtle motion through Eulerian video magnification.")
     with st.sidebar:
         st.header("Processing controls")
-        alpha = st.slider("Magnification factor (α)", 0, 100, 4)
+        alpha = st.slider("Magnification factor (\u03b1)", 0, 100, 4)
         mode = st.radio("Frequency mode", ["Manual", "Automatic"])
         if mode == "Automatic":
             st.caption("The manual band is used when the ROI estimate is unreliable.")
@@ -262,7 +270,7 @@ def main():
                 path.write_bytes(data)
                 frame = first_frame(path)
                 try:
-                    with st.spinner("Preparing original video for browser playback…"):
+                    with st.spinner("Preparing original video for browser playback\u2026"):
                         preview = encode_original_preview(path, Path(directory) / "preview.mp4")
                     preview_error = None
                 except OSError as error:
@@ -294,7 +302,7 @@ def main():
             st.error("The ROI must have positive width and height.")
         else:
             try:
-                with st.spinner("Analyzing and processing video on CPU…"), TemporaryDirectory() as directory:
+                with st.spinner("Processing at source resolution. Larger clips may take longer\u2026"), TemporaryDirectory() as directory:
                     path = Path(directory) / f"input{suffix}"
                     path.write_bytes(data)
                     result = process_video(path, Path(directory) / "output.mp4", settings)

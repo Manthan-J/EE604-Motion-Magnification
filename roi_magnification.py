@@ -1,9 +1,11 @@
 """CPU-only, ROI-guided Eulerian magnification of luminance detail."""
 
 import argparse
+from contextlib import ExitStack, contextmanager
 from itertools import chain
+import mmap
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryFile
 
 import cv2
 import numpy as np
@@ -30,8 +32,9 @@ def build_laplacian_pyramid(src, levels=3):
     return decompose_laplacian(src, levels)[-2::-1]
 
 
-def load_video(video_filename, *, max_decoded_bytes=None):
-    """Decode the actual frames and keep fractional source FPS."""
+@contextmanager
+def _video_capture(video_filename):
+    """Open a video with a valid frame rate and release it on exit."""
     cap = cv2.VideoCapture(str(video_filename))
     try:
         if not cap.isOpened():
@@ -39,19 +42,50 @@ def load_video(video_filename, *, max_decoded_bytes=None):
         fps = cap.get(cv2.CAP_PROP_FPS)
         if not np.isfinite(fps) or fps <= 0:
             raise ValueError(f"Input video has invalid FPS: {video_filename}")
-        frames = []
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
+        yield cap, fps
+    finally:
+        cap.release()
+
+
+def _decoded_frames(cap):
+    """Yield decoded frames one at a time."""
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            return
+        yield frame
+
+
+def load_video(video_filename, *, max_decoded_bytes=None):
+    """Decode the actual frames and keep fractional source FPS."""
+    frames = []
+    with _video_capture(video_filename) as (cap, fps):
+        for frame in _decoded_frames(cap):
             if max_decoded_bytes is not None and (len(frames) + 1) * frame.nbytes > max_decoded_bytes:
                 raise ValueError("This clip is too large after decoding. Use a shorter or lower-resolution video.")
             frames.append(frame)
-        if not frames:
-            raise ValueError(f"No frames could be decoded: {video_filename}")
-    finally:
-        cap.release()
+    if not frames:
+        raise ValueError(f"No frames could be decoded: {video_filename}")
     return np.stack(frames), fps
+
+
+@contextmanager
+def cache_video_frames(video_filename, directory):
+    """Spool decoded BGR frames to a temporary file and map the actual frame count."""
+    with TemporaryFile(dir=directory) as store:
+        count = 0
+        with _video_capture(video_filename) as (cap, fps):
+            for frame in _decoded_frames(cap):
+                if count == 0:
+                    shape = frame.shape
+                elif frame.shape != shape:
+                    raise ValueError("Video frame dimensions change during playback.")
+                frame.tofile(store)
+                count += 1
+        if not count:
+            raise ValueError(f"No frames could be decoded: {video_filename}")
+        with mmap.mmap(store.fileno(), 0, access=mmap.ACCESS_READ) as mapped:
+            yield np.ndarray((count, *shape), dtype=np.uint8, buffer=mapped), fps
 
 
 def _bandpass_sections(low, high, fps, order):
@@ -117,8 +151,46 @@ def generate_pyramid_masks(base_mask, levels):
     return build_gaussian_pyramid(support, levels - 1)[::-1]
 
 
+def _filtered_bands(frames, masks, sections, resources, scratch_directory):
+    """Build and filter detail bands in RAM or in temporary files."""
+    shapes = [(len(frames), *mask.shape) for mask in masks]
+    if scratch_directory is None:
+        bands = [np.empty(shape, dtype=np.float32) for shape in shapes]
+    else:
+        stores = [resources.enter_context(TemporaryFile(dir=scratch_directory)) for _ in masks]
+    for i, frame in enumerate(frames):
+        gray = cv2.cvtColor(frame.astype(np.float32), cv2.COLOR_BGR2GRAY)
+        details = build_laplacian_pyramid(gray, len(masks))
+        if scratch_directory is None:
+            for band, detail in zip(bands, details):
+                band[i] = detail
+        else:
+            # Write sequentially before mapping so disk write errors surface as exceptions.
+            for store, detail in zip(stores, details):
+                detail.tofile(store)
+    if scratch_directory is not None:
+        bands = []
+        for store, shape in zip(stores, shapes):
+            mapped = resources.enter_context(mmap.mmap(store.fileno(), 0))
+            bands.append(np.ndarray(shape, dtype=np.float32, buffer=mapped))
+
+    for band, mask in zip(bands, masks):
+        flat = band.reshape(len(frames), -1)
+        weights = mask.ravel()
+        # Bound the filter's float64 scratch space while keeping each full time series.
+        block_size = min(16 * mask.shape[1], max(1, 1_000_000 // len(frames)))
+        for start in range(0, weights.size, block_size):
+            stop = start + block_size
+            block, block_weights = flat[:, start:stop], weights[start:stop]
+            if np.any(block_weights):
+                block[:] = _filter_time(block, sections) * block_weights
+            else:
+                block.fill(0)
+    return bands
+
+
 def _magnified_frames(frames, fps, low, high, levels, amplification, base_mask,
-                      artifact_suppression=False):
+                      artifact_suppression=False, *, scratch_directory=None):
     """Yield magnified BGR frames after filtering their luminance details."""
     if frames.ndim != 4 or frames.shape[-1] != 3 or frames.dtype != np.uint8:
         raise ValueError("Frames must be a uint8 array with shape (time, height, width, 3).")
@@ -135,57 +207,50 @@ def _magnified_frames(frames, fps, low, high, levels, amplification, base_mask,
         return
 
     masks = generate_pyramid_masks(base_mask, levels)
-    bands = [np.empty((len(frames), *mask.shape), dtype=np.float32) for mask in masks]
-    for i, frame in enumerate(frames):
-        # Work in luminance to avoid amplifying RGB channel differences.
-        gray = cv2.cvtColor(frame.astype(np.float32), cv2.COLOR_BGR2GRAY)
-        for band, detail in zip(bands, build_laplacian_pyramid(gray, levels)):
-            band[i] = detail
-
-    for band, mask in zip(bands, masks):
-        # Spatial strips bound the filter's float64 scratch space. Every pixel
-        # still sees the entire time series, so there are no temporal seams.
-        for y in range(0, band.shape[1], 16):
-            strip = band[:, y:y + 16]
-            strip[:] = _filter_time(strip, sections) * mask[y:y + 16]
-
     # Match the submitted normalized filter's color sigma in amplified pixel units.
     sigma_color = 0.1 * 255 / max(amplification, 1e-6) if artifact_suppression else None
-    for i, frame in enumerate(frames):
-        details = [band[i] for band in bands]
-        if artifact_suppression:
-            details = [suppress_artifacts(detail, sigma_color=sigma_color) for detail in details]
-        # Collapse the signed details without restoring the unfiltered Gaussian base.
-        residual = reconstruct_laplacian_pyramid(details[::-1])
-        # Upsampling coarse bands spreads their support. Gate again at full
-        # resolution so pixels outside the rectangle are exactly unchanged.
-        delta = (residual * base_mask).astype(np.float64)
-        with np.errstate(over="ignore"):
-            delta *= amplification
-        # Limit the same signed delta for all three channels to preserve their
-        # differences, even when a channel would otherwise saturate.
-        np.clip(delta, -frame.min(axis=2).astype(np.int16), 255 - frame.max(axis=2),
-                out=delta)
-        adjustment = np.rint(delta).astype(np.int16)
-        yield (frame + adjustment[..., None]).astype(np.uint8)
+    with ExitStack() as resources:
+        bands = _filtered_bands(frames, masks, sections, resources, scratch_directory)
+        for i, frame in enumerate(frames):
+            details = [band[i] for band in bands]
+            if artifact_suppression:
+                details = [suppress_artifacts(detail, sigma_color=sigma_color) for detail in details]
+            # Collapse the signed details without restoring the unfiltered Gaussian base.
+            residual = reconstruct_laplacian_pyramid(details[::-1])
+            # Upsampling coarse bands spreads their support. Gate again at full
+            # resolution so pixels outside the rectangle are exactly unchanged.
+            delta = (residual * base_mask).astype(np.float64)
+            with np.errstate(over="ignore"):
+                delta *= amplification
+            # Limit the same signed delta for all three channels to preserve their
+            # differences, even when a channel would otherwise saturate.
+            np.clip(delta, -frame.min(axis=2).astype(np.int16), 255 - frame.max(axis=2),
+                    out=delta)
+            adjustment = np.rint(delta).astype(np.int16)
+            yield (frame + adjustment[..., None]).astype(np.uint8)
 
 
-def magnify_frames(frames, fps, low, high, roi=None, levels=3, amplification=4, *,
-                   artifact_suppression=False):
-    """Magnify BGR frames, optionally smoothing each filtered detail band.
-
-    ROI=None selects the full frame. With a rectangle, pixels outside it are
-    preserved even when bilateral suppression is enabled.
-    """
+def iter_magnified_frames(frames, fps, low, high, roi=None, levels=3, amplification=4, *,
+                          artifact_suppression=False, scratch_directory=None):
+    """Yield magnified BGR frames, optionally storing detail bands on disk."""
     frames = np.asarray(frames)
     if frames.ndim != 4:
         raise ValueError("Expected frames with shape (time, height, width, 3).")
     mask = np.ones(frames.shape[1:3], dtype=np.float32)
     if roi is not None:
         mask = make_roi_mask(frames.shape[1:], roi)
+    yield from _magnified_frames(frames, fps, low, high, levels, amplification, mask,
+                                 artifact_suppression, scratch_directory=scratch_directory)
+
+
+def magnify_frames(frames, fps, low, high, roi=None, levels=3, amplification=4, *,
+                   artifact_suppression=False):
+    """Return magnified BGR frames as an array, preserving pixels outside the ROI."""
+    frames = np.asarray(frames)
     result = np.empty_like(frames)
-    for i, frame in enumerate(_magnified_frames(frames, fps, low, high, levels,
-                                                amplification, mask, artifact_suppression)):
+    for i, frame in enumerate(iter_magnified_frames(frames, fps, low, high, roi, levels,
+                                                    amplification,
+                                                    artifact_suppression=artifact_suppression)):
         result[i] = frame
     return result
 

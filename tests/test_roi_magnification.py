@@ -10,6 +10,8 @@ import numpy as np
 from roi_magnification import (
     build_laplacian_pyramid,
     butter_bandpass_filter,
+    cache_video_frames,
+    iter_magnified_frames,
     load_video,
     magnify_frames,
     magnify_motion_with_roi,
@@ -70,6 +72,24 @@ class RoiMagnificationTests(unittest.TestCase):
         self.assertAlmostEqual(fps, 29.97, places=2)
         expected = np.pad(frames, ((0, 0), (0, 1), (0, 1), (0, 0)), mode="edge")
         np.testing.assert_array_equal(decoded, expected)
+
+    def test_disk_backed_frames_and_bands_match_in_memory_processing(self):
+        frames = np.random.default_rng(604).integers(64, 192, (90, 34, 66, 3), dtype=np.uint8)
+        with TemporaryDirectory(dir=".") as directory:
+            path = Path(directory) / "input.avi"
+            save_video(frames, 29.97, path)
+            with cache_video_frames(path, directory) as (cached, fps):
+                self.assertAlmostEqual(fps, 29.97, places=2)
+                np.testing.assert_array_equal(cached, frames)
+                for suppression in (False, True):
+                    with self.subTest(suppression=suppression):
+                        settings = {"roi": (6, 5, 25, 25), "artifact_suppression": suppression}
+                        expected = magnify_frames(frames, fps, 0.8, 1.6, **settings)
+                        streamed = iter_magnified_frames(
+                            cached, fps, 0.8, 1.6, scratch_directory=directory, **settings,
+                        )
+                        np.testing.assert_array_equal(np.stack(list(streamed)), expected)
+            self.assertEqual(list(Path(directory).iterdir()), [path])
 
     def test_cancel_does_not_write_video(self):
         with TemporaryDirectory() as directory:
