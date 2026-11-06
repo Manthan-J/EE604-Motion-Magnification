@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from auto_frequency import estimate_dominant_frequency
+from src.auto_frequency import estimate_dominant_frequency
 
 
 @dataclass(frozen=True)

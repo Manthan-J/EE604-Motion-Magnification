@@ -151,7 +151,7 @@ Effective FPS is the number of processed frames divided by this runtime.
 \toprule
 Wrist & Outside RMS & Gain & s & FPS\\
 \midrule
-\input{results/validation/wrist-table.tex}
+\input{docs/results/validation/wrist-table.tex}
 \bottomrule
 \end{tabular}
 \caption{Matched wrist results on 894 frames at $320 \times 176$ and
@@ -167,7 +167,7 @@ at the selected 0.9\,Hz frequency.}
 \toprule
 Synthetic & RMSE & Gain & s & FPS\\
 \midrule
-\input{results/validation/synthetic-table.tex}
+\input{docs/results/validation/synthetic-table.tex}
 \bottomrule
 \end{tabular}
 \caption{Matched synthetic results on 360 frames at $160 \times 80$ and
@@ -188,14 +188,14 @@ when the initial band is wrong.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{results/validation/wrist-psd.png}
+\includegraphics[width=\linewidth]{docs/results/validation/wrist-psd.png}
 \caption{Full wrist ROI spectrum with the eligible search range shaded.}
 \label{fig:psd}
 \end{figure}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.73\textwidth]{results/validation/synthetic-xt.png}
+\includegraphics[width=0.73\textwidth]{docs/results/validation/synthetic-xt.png}
 \caption{Synthetic space--time slices through the same horizontal scan
 line. The columns use a common grayscale range.}
 \label{fig:xt}
@@ -281,17 +281,17 @@ C. Tomasi and R. Manduchi.
 \section{Reproduction}
 The source is available at
 \url{https://github.com/Manthan-J/EE604-Motion-Magnification}.
-Run \texttt{python benchmark\_evm.py} from the repository root to regenerate
-the tables, CSV and figures. Use \texttt{python -m streamlit run app2.py}
+Run \texttt{python -m src.benchmark\_evm} from the repository root to regenerate
+the tables, CSV and figures. Use \texttt{python -m streamlit run src/app2.py}
 to launch the demonstration. The benchmark also accepts a local video
 and explicit ROI for additional recordings. See the repository README
 for dependencies and commands.
 
 \section{Source Code}
 \codefile{src/spatial.py}
-\codefile{auto_frequency.py}
-\codefile{auto_roi.py}
-\codefile{roi_magnification.py}
-\codefile{app2.py}
-\codefile{benchmark_evm.py}
+\codefile{src/auto_frequency.py}
+\codefile{src/auto_roi.py}
+\codefile{src/roi_magnification.py}
+\codefile{src/app2.py}
+\codefile{src/benchmark_evm.py}
 \end{document}

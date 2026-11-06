@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 from scipy import signal
 
-from auto_frequency import estimate_dominant_frequency, extract_roi_signal
+from src.auto_frequency import estimate_dominant_frequency, extract_roi_signal
 from src.spatial import (
     build_laplacian_pyramid as decompose_laplacian,
     reconstruct_laplacian_pyramid,
@@ -326,7 +326,7 @@ def magnify_motion_with_roi(video_name, low, high, levels=3, amplification=4, *,
 
 def main():
     """Run with the bundled baby clip or an explicit input and passband."""
-    default_video = Path(__file__).resolve().parent / "PyEVM" / "baby.mp4"
+    default_video = Path(__file__).resolve().parents[1] / "data" / "pyevm" / "baby.mp4"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("video", nargs="?", default=default_video)
     parser.add_argument("--output", default="out_masked.avi")

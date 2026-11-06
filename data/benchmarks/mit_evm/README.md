@@ -21,4 +21,4 @@ Transactions on Graphics (Proc. SIGGRAPH), 31(4), 2012.
 
 Every listed frame was decoded successfully with the project OpenCV environment
 after download. Preserve these files unchanged as benchmark inputs; write all
-generated videos under `results/`.
+generated videos under `docs/results/`.

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from roi_magnification import (
+from src.roi_magnification import (
     build_laplacian_pyramid,
     butter_bandpass_filter,
     cache_video_frames,
@@ -95,8 +95,8 @@ class RoiMagnificationTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             output = Path(directory) / "result.avi"
             frames = np.zeros((2, 16, 16, 3), dtype=np.uint8)
-            with patch("roi_magnification.load_video", return_value=(frames, 30)), patch(
-                "roi_magnification.select_interactive_roi", return_value=None
+            with patch("src.roi_magnification.load_video", return_value=(frames, 30)), patch(
+                "src.roi_magnification.select_interactive_roi", return_value=None
             ):
                 result = magnify_motion_with_roi("input.avi", 0.8, 1.6, output_path=output)
             self.assertIsNone(result)
@@ -111,11 +111,11 @@ class RoiMagnificationTests(unittest.TestCase):
         distractor = np.rint(100 + 30 * np.sin(2 * np.pi * 2.0 * time))
         frames[:, 3:11, 5:15, 1] = target[:, None, None]
         frames[:, :, 16:, 1] = distractor[:, None, None]
-        with patch("roi_magnification.load_video", return_value=(frames, fps)), patch(
-            "roi_magnification.cv2.selectROI", return_value=roi
-        ) as select, patch("roi_magnification.cv2.destroyWindow"), patch(
-            "roi_magnification._magnified_frames"
-        ) as magnify, patch("roi_magnification.save_video"), patch("builtins.print"):
+        with patch("src.roi_magnification.load_video", return_value=(frames, fps)), patch(
+            "src.roi_magnification.cv2.selectROI", return_value=roi
+        ) as select, patch("src.roi_magnification.cv2.destroyWindow"), patch(
+            "src.roi_magnification._magnified_frames"
+        ) as magnify, patch("src.roi_magnification.save_video"), patch("builtins.print"):
             magnify_motion_with_roi("input.avi", 0.4, 0.8, auto_search=(0.65, 3.0))
         select.assert_called_once()
         self.assertAlmostEqual(magnify.call_args.args[2], 1.0)
@@ -124,9 +124,9 @@ class RoiMagnificationTests(unittest.TestCase):
 
     def test_auto_frequency_uses_manual_band_when_roi_has_no_variation(self):
         frames = np.full((300, 16, 16, 3), 80, dtype=np.uint8)
-        with patch("roi_magnification.load_video", return_value=(frames, 30)), patch(
-            "roi_magnification._magnified_frames"
-        ) as magnify, patch("roi_magnification.save_video"), patch("builtins.print"):
+        with patch("src.roi_magnification.load_video", return_value=(frames, 30)), patch(
+            "src.roi_magnification._magnified_frames"
+        ) as magnify, patch("src.roi_magnification.save_video"), patch("builtins.print"):
             magnify_motion_with_roi("input.avi", 0.4, 1.0, roi=(2, 3, 8, 8),
                                     auto_search=(0.65, 3.0))
         self.assertEqual(magnify.call_args.args[2:4], (0.4, 1.0))

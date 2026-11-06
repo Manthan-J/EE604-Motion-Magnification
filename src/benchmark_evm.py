@@ -10,14 +10,14 @@ import cv2
 import matplotlib
 import numpy as np
 
-from auto_frequency import estimate_dominant_frequency, extract_roi_signal
-from roi_magnification import magnify_frames
+from src.auto_frequency import estimate_dominant_frequency, extract_roi_signal
+from src.roi_magnification import magnify_frames
 
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 SEARCH_BAND = (0.65, 3.0)
 VARIANTS = (
     ("Baseline", False, False, False),
@@ -219,7 +219,7 @@ def write_results(output, rows):
 def main():
     """Run the bundled suite, or evaluate one explicitly selected local clip."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "results" / "validation")
+    parser.add_argument("--output", type=Path, default=ROOT / "docs" / "results" / "validation")
     parser.add_argument("--alpha", type=float, default=4)
     parser.add_argument("--video", type=Path, help="Optional private or additional benchmark clip")
     parser.add_argument("--roi", type=int, nargs=4, metavar=("X", "Y", "W", "H"),
@@ -243,8 +243,8 @@ def main():
         clips = (
             ("wrist", ROOT / "data/derived/wrist_half_resolution.mp4",
              (174, 82, 54, 54), 30, (0.7, 1.1)),
-            ("baby", ROOT / "PyEVM/baby.mp4", (340, 210, 260, 158), 10, (0.4, 1.0)),
-            ("guitar", ROOT / "PyEVM/guitar.mp4", (121, 71, 183, 42), 10, (0.4, 3.0)),
+            ("baby", ROOT / "data/pyevm/baby.mp4", (340, 210, 260, 158), 10, (0.4, 1.0)),
+            ("guitar", ROOT / "data/pyevm/guitar.mp4", (121, 71, 183, 42), 10, (0.4, 3.0)),
         )
     else:
         clips = (("custom", args.video, args.roi, args.seconds, args.band),)

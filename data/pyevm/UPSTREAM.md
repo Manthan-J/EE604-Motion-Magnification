@@ -10,5 +10,5 @@ cloned and developed as one repository. New project implementation should be
 developed outside this directory; retain this copy for baseline comparison and
 attribution.
 
-The bundled input and generated video files are intentionally excluded from
-the main repository because they are large binary assets.
+The bundled baby and guitar inputs are shared for reproducible testing.
+Generated videos are excluded from Git.

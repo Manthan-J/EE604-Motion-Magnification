@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from auto_frequency import FrequencyEstimate, estimate_dominant_frequency, estimate_frequency_from_video
+from src.auto_frequency import FrequencyEstimate, estimate_dominant_frequency, estimate_frequency_from_video
 
 
 def print_estimate(label: str, result: FrequencyEstimate) -> None:
@@ -51,7 +51,7 @@ def main() -> None:
         save_spectrum(result, args.plot)
 
     if args.benchmark:
-        video = Path(__file__).resolve().parent / "data" / "benchmarks" / "mit_evm" / "face.mp4"
+        video = Path(__file__).resolve().parents[1] / "data" / "benchmarks" / "mit_evm" / "face.mp4"
         # Forehead rectangle chosen on the original 528 x 592 first frame.
         detection_roi = (170, 100, 160, 55)
         result = estimate_frequency_from_video(str(video), detection_roi, 0.7, 2.5)

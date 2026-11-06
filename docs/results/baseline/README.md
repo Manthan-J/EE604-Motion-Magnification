@@ -8,7 +8,7 @@ each filename or its accompanying notes so future comparisons are reproducible.
 
 ### `baby_color_upstream_legacy.avi`
 
-- Source: bundled upstream `PyEVM/baby.mp4`
+- Source: bundled upstream `data/pyevm/baby.mp4`
 - Provenance: pre-generated file supplied by upstream commit `00649cc`; not
   generated or parameter-verified in the current environment
 - Output: 960x544, 30 FPS, 301 frames, approximately 10.03 seconds
@@ -19,7 +19,7 @@ each filename or its accompanying notes so future comparisons are reproducible.
 
 ### `baby_motion_upstream_legacy.avi`
 
-- Source: bundled upstream `PyEVM/baby.mp4`
+- Source: bundled upstream `data/pyevm/baby.mp4`
 - Provenance: pre-generated file supplied by upstream commit `00649cc`; not
   generated or parameter-verified in the current environment
 - Output: 960x544, 30 FPS, 301 frames, approximately 10.03 seconds
@@ -31,8 +31,8 @@ identical to `baby-color-result.avi`.
 
 ### `guitar_motion_legacy_0.4-3Hz_a20.avi`
 
-- Source: `PyEVM/guitar.mp4`
-- Implementation: unmodified `PyEVM/EVM.py` motion path at upstream commit `00649cc`
+- Source: `data/pyevm/guitar.mp4`
+- Implementation: unmodified `data/pyevm/EVM.py` motion path at upstream commit `00649cc`
 - Temporal filter: fifth-order causal Butterworth bandpass (`scipy.signal.lfilter`)
 - Passband: 0.4--3.0 Hz
 - Amplification: 20
@@ -48,7 +48,7 @@ after temporal filtering, gain control, reconstruction, and clipping are fixed.
 ### `face_color_legacy_0.83-1Hz_a100.avi`
 
 - Source: `data/benchmarks/mit_evm/face.mp4`
-- Implementation: unmodified `PyEVM/EVM.py` color path at upstream commit `00649cc`
+- Implementation: unmodified `data/pyevm/EVM.py` color path at upstream commit `00649cc`
 - Temporal filter: ideal FFT bandpass
 - Passband: 0.83--1.0 Hz
 - Amplification: 100
@@ -60,7 +60,7 @@ after temporal filtering, gain control, reconstruction, and clipping are fixed.
 ### `subway_motion_legacy_0.4-3Hz_a20.avi`
 
 - Source: `data/benchmarks/mit_evm/subway.mp4`
-- Implementation: unmodified `PyEVM/EVM.py` motion path at upstream commit `00649cc`
+- Implementation: unmodified `data/pyevm/EVM.py` motion path at upstream commit `00649cc`
 - Temporal filter: fifth-order causal Butterworth bandpass (`scipy.signal.lfilter`)
 - Passband: 0.4--3.0 Hz
 - Amplification: 20
@@ -77,7 +77,7 @@ after temporal filtering, gain control, reconstruction, and clipping are fixed.
   after approximately seven minutes because the legacy implementation stores
   several full-video float64 tensors in memory
 - Derivative: 320x176, 30 FPS, all 894 frames and the full 29.8-second duration
-- Implementation: unmodified `PyEVM/EVM.py` motion path at upstream commit `00649cc`
+- Implementation: unmodified `data/pyevm/EVM.py` motion path at upstream commit `00649cc`
 - Passband: 0.4--3.0 Hz
 - Amplification: 20
 - Pyramid levels: 3

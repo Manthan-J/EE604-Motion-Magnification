@@ -14,9 +14,9 @@ import cv2
 import numpy as np
 import streamlit as st
 
-from auto_frequency import estimate_dominant_frequency, extract_roi_signal
-from auto_roi import suggest_periodic_roi
-from roi_magnification import cache_video_frames, iter_magnified_frames
+from src.auto_frequency import estimate_dominant_frequency, extract_roi_signal
+from src.auto_roi import suggest_periodic_roi
+from src.roi_magnification import cache_video_frames, iter_magnified_frames
 
 
 def first_frame(path):

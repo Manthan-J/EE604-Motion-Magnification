@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from auto_frequency import estimate_dominant_frequency, extract_roi_signal
+from src.auto_frequency import estimate_dominant_frequency, extract_roi_signal
 
 
 class FrequencyEstimateTests(unittest.TestCase):
